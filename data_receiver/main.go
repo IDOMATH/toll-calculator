@@ -8,21 +8,44 @@ import (
 	"net/http"
 )
 
+var kafkaTopic = "obudata"
+
 func main() {
-	receiver := NewDataReceiver()
+	receiver, err := NewDataReceiver()
+	if err != nil {
+		log.Fatal(err)
+	}
 	http.HandleFunc("/ws", receiver.handleWebSocket)
 	http.ListenAndServe(":30000", nil)
 }
 
 type DataReceiver struct {
-	msgch chan types.ObuData
-	conn  *websocket.Conn
+	msgch    chan types.ObuData
+	conn     *websocket.Conn
+	producer DataProducer
 }
 
-func NewDataReceiver() *DataReceiver {
-	return &DataReceiver{
-		msgch: make(chan types.ObuData, 128),
+func NewDataReceiver() (*DataReceiver, error) {
+	var (
+		p          DataProducer
+		err        error
+		kafkaTopic = "obudata"
+	)
+	p, err = NewKafkaProducer(kafkaTopic)
+	if err != nil {
+		return nil, err
 	}
+
+	p = NewLogMiddleware(p)
+
+	return &DataReceiver{
+		msgch:    make(chan types.ObuData, 128),
+		producer: p,
+	}, nil
+}
+
+func (dr *DataReceiver) produceData(data types.ObuData) error {
+	return dr.producer.ProduceData(data)
 }
 
 func (dr *DataReceiver) handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +70,9 @@ func (dr *DataReceiver) webSocketReceiveLoop() {
 			log.Println("read error:", err)
 			continue
 		}
-		fmt.Printf("received OBU data from [%d] :: <lat %.2f, long %.2f> \n", data.ObuId, data.Lat, data.Long)
-		dr.msgch <- data
+		fmt.Println("received message", data)
+		if err := dr.produceData(data); err != nil {
+			fmt.Println("kafka produce error:", err)
+		}
 	}
 }

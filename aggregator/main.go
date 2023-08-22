@@ -12,10 +12,11 @@ func main() {
 	listenPort := flag.String("listenPort", ":3000", "listen port for the HTTP server")
 	flag.Parse()
 
-	store := NewMemoryStore()
 	var (
-		svc = NewInvoiceAggregator(store)
+		store = NewMemoryStore()
+		svc   = NewInvoiceAggregator(store)
 	)
+	svc = NewLogMiddleware(svc)
 
 	makeHttpTransport(*listenPort, svc)
 }
@@ -30,8 +31,18 @@ func handleAggregate(svc Aggregator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var distance types.Distance
 		if err := json.NewDecoder(r.Body).Decode(&distance); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			writeJson(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		if err := svc.AggregateDistance(distance); err != nil {
+			writeJson(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
 	}
+}
+
+func writeJson(rw http.ResponseWriter, status int, v any) error {
+	rw.WriteHeader(status)
+	rw.Header().Add("Content-Type", "application/json")
+	return json.NewEncoder(rw).Encode(v)
 }

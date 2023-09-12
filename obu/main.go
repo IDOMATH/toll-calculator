@@ -4,7 +4,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/idomath/toll-calculator/types"
 	"log"
-	"math"
 	"math/rand"
 	"time"
 )
@@ -32,7 +31,7 @@ func genLocation() (float64, float64) {
 func generateObuIds(n int) []int {
 	ids := make([]int, n)
 	for i := 0; i < n; i++ {
-		ids[i] = rand.Intn(math.MaxInt)
+		ids[i] = rand.Intn(999999)
 	}
 	return ids
 }

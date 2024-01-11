@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/idomath/toll-calculator/types"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"log"
 	"net"
@@ -33,6 +34,7 @@ func makeHttpTransport(listenPort string, svc Aggregator) error {
 	fmt.Println("HTTP transport running on port: ", listenPort)
 	http.HandleFunc("/aggregate", handleAggregate(svc))
 	http.HandleFunc("/invoice", handleInvoice(svc))
+	http.Handle("/metrics", promhttp.Handler())
 	return http.ListenAndServe(listenPort, nil)
 }
 
